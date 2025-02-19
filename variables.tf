@@ -7,9 +7,9 @@ variable "region" {
   type        = string
 }
 
-variable "profile" {
+variable "profile" 
   description = "user profile"
-  # type        = string
+  type        = string
 }
 
 variable "cidr_block" {
