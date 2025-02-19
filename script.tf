@@ -86,10 +86,6 @@ resource "aws_internet_gateway" "IGW" {
   }
 }
 
-# Create an Elastic IP for NAT Gateway
-resource "aws_eip" "nat" {
-  domain = "vpc"
-}
 # Add Route to Public Route Table (Route to Internet)
 resource "aws_route" "public_internet_access" {
   route_table_id         = aws_route_table.public_rt.id
