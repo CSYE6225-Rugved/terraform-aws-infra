@@ -7,7 +7,7 @@ variable "region" {
   type        = string
 }
 
-variable "profile" {
+variable "profikjjle" {
   description = "user profile"
   type        = string
 }
