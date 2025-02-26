@@ -31,3 +31,20 @@ variable "private_subnet_cidrs" {
   description = "CIDR blocks for private subnets"
   type        = list(string)
 }
+
+
+# EC2 Instance variables
+variable "ami_id" {
+  description = "AMI ID for the EC2 instance"
+  type        = string
+}
+
+variable "instance_type" {
+  description = "Instance type for the EC2 instance"
+  type        = string
+}
+
+variable "app_port" {
+  description = "Port on which the application runs"
+  type        = number
+}
