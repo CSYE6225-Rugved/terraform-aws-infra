@@ -171,6 +171,7 @@ resource "aws_security_group_rule" "allow_app_port" {
 resource "aws_instance" "web" {
   count                  = local.selected_subnet_id != null ? 1 : 0 # Prevent error if no subnet found
   ami                    = var.ami_id
+  key_name               = var.key_name
   instance_type          = var.instance_type
   subnet_id              = local.selected_subnet_id
   vpc_security_group_ids = [aws_security_group.application_sg.id]

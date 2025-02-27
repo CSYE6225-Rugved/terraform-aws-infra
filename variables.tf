@@ -48,3 +48,7 @@ variable "app_port" {
   description = "Port on which the application runs"
   type        = number
 }
+variable "key_name" {
+  description = "The name of the SSH key pair to use for EC2"
+  type        = string
+}
