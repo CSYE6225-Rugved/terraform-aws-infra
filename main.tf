@@ -124,6 +124,12 @@ resource "aws_route_table_association" "private_assoc" {
 resource "aws_security_group" "application_sg" {
   vpc_id = aws_vpc.Development.id
 
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"] # Allow all outbound traffic
+  }
   tags = {
     Name = "${var.vpc_name}-application-sg"
   }
@@ -166,15 +172,73 @@ resource "aws_security_group_rule" "allow_app_port" {
 }
 
 # -----------------------
-# Create EC2 Instance
+# Create IAM Role for EC2
+# -----------------------
+resource "aws_iam_role" "ec2_role" {
+  name = "ec2_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+resource "aws_iam_instance_profile" "ec2_instance_profile" {
+  name = "ec2_instance_profile"
+  role = aws_iam_role.ec2_role.name
+}
+
+# -----------------------
+# Create IAM Policy for EC2
+# -----------------------
+resource "aws_iam_policy" "ec2_policy" {
+  name        = "ec2_policy"
+  description = "Policy for EC2 instance to access S3"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::${aws_s3_bucket.webapp_bucket.bucket}",
+          "arn:aws:s3:::${aws_s3_bucket.webapp_bucket.bucket}/*"
+        ]
+      },
+    ]
+  })
+}
+
+# -----------------------
+# Attach Policy to IAM Role
+# -----------------------
+resource "aws_iam_role_policy_attachment" "ec2_role_policy_attachment" {
+  policy_arn = aws_iam_policy.ec2_policy.arn
+  role       = aws_iam_role.ec2_role.name
+}
+
+# -----------------------
+# Create EC2 Instance with IAM Role
 # -----------------------
 resource "aws_instance" "web" {
-  count                  = local.selected_subnet_id != null ? 1 : 0 # Prevent error if no subnet found
   ami                    = var.ami_id
   key_name               = var.key_name
   instance_type          = var.instance_type
-  subnet_id              = local.selected_subnet_id
+  subnet_id              = aws_subnet.public[0].id
   vpc_security_group_ids = [aws_security_group.application_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_instance_profile.name
 
   root_block_device {
     volume_size           = 25
@@ -182,7 +246,120 @@ resource "aws_instance" "web" {
     delete_on_termination = true
   }
 
+  user_data = templatefile("${path.module}/user_data.sh", {
+    DB_USER            = var.db_username
+    DB_PASSWORD        = var.db_password
+    AWS_REGION         = var.region
+    AWS_S3_BUCKET_NAME = aws_s3_bucket.webapp_bucket.id
+    DB_HOST            = replace(aws_db_instance.rdsinstance.endpoint, ":3306", "")
+  })
+
   tags = {
     Name = "${var.vpc_name}-web-instance"
+  }
+}
+
+# -----------------------
+# Create S3 Bucket
+# -----------------------
+
+# S3 Bucket
+resource "random_uuid" "bucket_uuid" {}
+
+resource "aws_s3_bucket" "webapp_bucket" {
+  bucket = "myec2-webapp-bucket-${random_uuid.bucket_uuid.result}"
+
+  tags = {
+    Name        = "${var.vpc_name}-webapp-bucket"
+    Environment = "Dev"
+  }
+  force_destroy = true # to delete non-empty bucket
+
+  # Enable default encryption using AES-256
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+}
+
+# S3 Bucket Lifecycle Configuration
+resource "aws_s3_bucket_lifecycle_configuration" "webapp_bucekt_lifecycle" {
+  bucket = aws_s3_bucket.webapp_bucket.id
+
+  rule {
+    id     = "transition-to-standard-ia"
+    status = "Enabled"
+
+    expiration {
+      days = 365
+    }
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+  }
+}
+
+# -----------------------
+# Create DB security Group
+# -----------------------
+
+resource "aws_security_group" "db_sg" {
+  name        = "database security group"
+  description = "Allow mysql database access from application group"
+  vpc_id      = aws_vpc.Development.id
+
+  ingress {
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
+    security_groups = [aws_security_group.application_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"] # Allow all outbound traffic
+  }
+
+  tags = {
+    Name = "DB security group"
+  }
+}
+
+# -----------------------
+# Create DB RDS instance
+# -----------------------
+resource "aws_db_subnet_group" "private" {
+  name       = "${lower(replace(var.vpc_name, "[^a-z0-9_-]", "_"))}-private-db-subnet-group"
+  subnet_ids = [for subnet in aws_subnet.private : subnet.id]
+
+  tags = {
+    Name = "Private DB Subnet Group"
+  }
+}
+
+resource "aws_db_instance" "rdsinstance" {
+  identifier           = "csye6225"
+  engine               = "mysql"
+  instance_class       = "db.t3.micro"
+  db_subnet_group_name = aws_db_subnet_group.private.name
+  multi_az             = false
+  publicly_accessible  = false
+  username             = var.db_username
+  password             = var.db_password
+  db_name              = "csye6225"
+  allocated_storage    = 20
+  skip_final_snapshot  = true
+
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+
+  tags = {
+    Name = "MySQL Database"
   }
 }

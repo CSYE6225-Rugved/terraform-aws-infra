@@ -52,3 +52,13 @@ variable "key_name" {
   description = "The name of the SSH key pair to use for EC2"
   type        = string
 }
+
+# RDS variables
+variable "db_username" {
+  description = "Username for the RDS instance"
+  type        = string
+}
+variable "db_password" {
+  description = "Password for the RDS instance"
+  type        = string
+}
