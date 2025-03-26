@@ -210,7 +210,8 @@ resource "aws_iam_policy" "ec2_policy" {
         Action = [
           "s3:ListBucket",
           "s3:GetObject",
-          "s3:PutObject"
+          "s3:PutObject",
+          "s3:DeleteObject"
         ]
         Resource = [
           "arn:aws:s3:::${aws_s3_bucket.webapp_bucket.bucket}",
@@ -228,7 +229,10 @@ resource "aws_iam_role_policy_attachment" "ec2_role_policy_attachment" {
   policy_arn = aws_iam_policy.ec2_policy.arn
   role       = aws_iam_role.ec2_role.name
 }
-
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+  role       = aws_iam_role.ec2_role.name
+}
 # -----------------------
 # Create EC2 Instance with IAM Role
 # -----------------------
@@ -333,6 +337,19 @@ resource "aws_security_group" "db_sg" {
 }
 
 # -----------------------
+# Create RDS parameter group
+# -----------------------
+resource "aws_db_parameter_group" "csye6225_db_parameter_group" {
+  name        = "csye6225-db-parameter-group"
+  family      = var.db_family
+  description = "Parameter group for the RDS instance"
+
+  parameter {
+    name  = "max_connections"
+    value = "150"
+  }
+}
+# -----------------------
 # Create DB RDS instance
 # -----------------------
 resource "aws_db_subnet_group" "private" {
@@ -349,6 +366,7 @@ resource "aws_db_instance" "rdsinstance" {
   engine               = "mysql"
   instance_class       = "db.t3.micro"
   db_subnet_group_name = aws_db_subnet_group.private.name
+  parameter_group_name = aws_db_parameter_group.csye6225_db_parameter_group.name
   multi_az             = false
   publicly_accessible  = false
   username             = var.db_username

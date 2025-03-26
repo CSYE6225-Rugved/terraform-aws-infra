@@ -62,3 +62,7 @@ variable "db_password" {
   description = "Password for the RDS instance"
   type        = string
 }
+variable "db_family" {
+  description = "DB family for the RDS instance"
+  type        = string
+}
