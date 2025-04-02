@@ -66,3 +66,8 @@ variable "db_family" {
   description = "DB family for the RDS instance"
   type        = string
 }
+
+variable "domain_name" {
+  description = "Your domain name (e.g., example.com)"
+  type        = string
+}
