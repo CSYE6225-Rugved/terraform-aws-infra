@@ -364,7 +364,7 @@ resource "aws_launch_template" "asg_template" {
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
     DB_USER            = var.db_username
-    SECRET_NAME         = aws_secretsmanager_secret.db_credentials.name
+    SECRET_NAME        = aws_secretsmanager_secret.db_credentials.name
     AWS_REGION         = var.region
     AWS_S3_BUCKET_NAME = aws_s3_bucket.webapp_bucket.id
     DB_HOST            = replace(aws_db_instance.rdsinstance.endpoint, ":3306", "")
