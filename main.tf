@@ -313,7 +313,7 @@ resource "aws_db_instance" "rdsinstance" {
   multi_az               = false
   publicly_accessible    = false
   username               = var.db_username
-  password               = var.db_password
+  password               = random_password.db_password.result
   db_name                = "csye6225"
   allocated_storage      = 20
   skip_final_snapshot    = true
@@ -364,7 +364,7 @@ resource "aws_launch_template" "asg_template" {
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
     DB_USER            = var.db_username
-    DB_PASSWORD        = var.db_password
+    SECRET_NAME         = aws_secretsmanager_secret.db_credentials.name
     AWS_REGION         = var.region
     AWS_S3_BUCKET_NAME = aws_s3_bucket.webapp_bucket.id
     DB_HOST            = replace(aws_db_instance.rdsinstance.endpoint, ":3306", "")
