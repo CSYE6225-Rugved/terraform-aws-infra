@@ -399,8 +399,10 @@ resource "aws_lb_target_group" "web_target_group" {
 
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.web_alb.arn
-  port              = 80
-  protocol          = "HTTP"
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = var.certificate_arn
 
   default_action {
     type             = "forward"
