@@ -537,8 +537,8 @@ resource "aws_kms_key" "ec2_kms_key" {
   description             = "KMS key for EC2 instances"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  rotation_period_in_days = 90  # 90-day rotation period
-  
+  rotation_period_in_days = 90 # 90-day rotation period
+
   tags = {
     Name = "${var.vpc_name}-ec2-kms-key"
   }
@@ -554,8 +554,8 @@ resource "aws_kms_key" "rds_kms_key" {
   description             = "KMS key for RDS instances"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  rotation_period_in_days = 90  # 90-day rotation period
-  
+  rotation_period_in_days = 90 # 90-day rotation period
+
   tags = {
     Name = "${var.vpc_name}-rds-kms-key"
   }
@@ -571,8 +571,8 @@ resource "aws_kms_key" "s3_kms_key" {
   description             = "KMS key for S3 buckets"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  rotation_period_in_days = 90  # 90-day rotation period
-  
+  rotation_period_in_days = 90 # 90-day rotation period
+
   tags = {
     Name = "${var.vpc_name}-s3-kms-key"
   }
@@ -588,8 +588,8 @@ resource "aws_kms_key" "secrets_kms_key" {
   description             = "KMS key for AWS Secrets Manager"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  rotation_period_in_days = 90  # 90-day rotation period
-  
+  rotation_period_in_days = 90 # 90-day rotation period
+
   tags = {
     Name = "${var.vpc_name}-secrets-kms-key"
   }
