@@ -187,7 +187,28 @@ resource "aws_iam_policy" "ec2_policy" {
         "arn:aws:s3:::${aws_s3_bucket.webapp_bucket.bucket}",
         "arn:aws:s3:::${aws_s3_bucket.webapp_bucket.bucket}/*"
       ]
-    }]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.db_credentials.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = [
+          aws_kms_key.secrets_kms_key.arn,
+          aws_kms_key.s3_kms_key.arn
+        ]
+      }
+    ]
   })
 }
 
@@ -218,7 +239,8 @@ resource "aws_s3_bucket" "webapp_bucket" {
   server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
-        sse_algorithm = "AES256"
+        sse_algorithm     = "aws:kms"
+        kms_master_key_id = aws_kms_key.s3_kms_key.arn
       }
     }
   }
@@ -309,12 +331,6 @@ resource "aws_security_group" "load_balancer_security_group" {
   vpc_id      = aws_vpc.Development.id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -399,8 +415,10 @@ resource "aws_lb_target_group" "web_target_group" {
 
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.web_alb.arn
-  port              = 80
-  protocol          = "HTTP"
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = var.certificate_arn
 
   default_action {
     type             = "forward"
@@ -508,4 +526,107 @@ resource "aws_route53_record" "dev" {
     zone_id                = aws_lb.web_alb.zone_id
     evaluate_target_health = true
   }
+}
+
+# -----------------------
+# AWS KMS Keys
+# -----------------------
+
+# EC2 KMS Key
+resource "aws_kms_key" "ec2_kms_key" {
+  description             = "KMS key for EC2 instances"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  rotation_period_in_days = 90 # 90-day rotation period
+
+  tags = {
+    Name = "${var.vpc_name}-ec2-kms-key"
+  }
+}
+
+resource "aws_kms_alias" "ec2_kms_alias" {
+  name          = "alias/${var.vpc_name}-ec2-kms"
+  target_key_id = aws_kms_key.ec2_kms_key.key_id
+}
+
+# RDS KMS Key
+resource "aws_kms_key" "rds_kms_key" {
+  description             = "KMS key for RDS instances"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  rotation_period_in_days = 90 # 90-day rotation period
+
+  tags = {
+    Name = "${var.vpc_name}-rds-kms-key"
+  }
+}
+
+resource "aws_kms_alias" "rds_kms_alias" {
+  name          = "alias/${var.vpc_name}-rds-kms"
+  target_key_id = aws_kms_key.rds_kms_key.key_id
+}
+
+# S3 KMS Key
+resource "aws_kms_key" "s3_kms_key" {
+  description             = "KMS key for S3 buckets"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  rotation_period_in_days = 90 # 90-day rotation period
+
+  tags = {
+    Name = "${var.vpc_name}-s3-kms-key"
+  }
+}
+
+resource "aws_kms_alias" "s3_kms_alias" {
+  name          = "alias/${var.vpc_name}-s3-kms"
+  target_key_id = aws_kms_key.s3_kms_key.key_id
+}
+
+# Secrets Manager KMS Key
+resource "aws_kms_key" "secrets_kms_key" {
+  description             = "KMS key for AWS Secrets Manager"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  rotation_period_in_days = 90 # 90-day rotation period
+
+  tags = {
+    Name = "${var.vpc_name}-secrets-kms-key"
+  }
+}
+
+resource "aws_kms_alias" "secrets_kms_alias" {
+  name          = "alias/${var.vpc_name}-secrets-kms"
+  target_key_id = aws_kms_key.secrets_kms_key.key_id
+}
+
+# -----------------------
+# Generate Random DB Password
+# -----------------------
+resource "random_password" "db_password" {
+  length           = 16
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+# Generate random UUID for secrets
+resource "random_uuid" "secrets_uuid" {}
+
+# Database credentials secret
+resource "aws_secretsmanager_secret" "db_credentials" {
+  name                    = "${var.vpc_name}-db-credentials-${random_uuid.secrets_uuid.result}"
+  kms_key_id              = aws_kms_key.secrets_kms_key.arn
+  recovery_window_in_days = 7
+
+  tags = {
+    Name = "${var.vpc_name}-db-credentials"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "db_credentials_version" {
+  secret_id = aws_secretsmanager_secret.db_credentials.id
+  secret_string = jsonencode({
+    username = var.db_username
+    password = random_password.db_password.result
+  })
 }

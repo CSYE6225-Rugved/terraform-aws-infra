@@ -71,3 +71,8 @@ variable "domain_name" {
   description = "Your domain name (e.g., example.com)"
   type        = string
 }
+variable "certificate_arn" {
+  description = "The ARN of the ACM certificate for the domain"
+  type        = string
+
+}
