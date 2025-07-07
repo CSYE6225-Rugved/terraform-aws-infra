@@ -1,9 +1,9 @@
-# tf-aws-infra
+# terraform-aws-infra
 
 ## Installation
 1. Clone the repository:
     ```sh
-    git clone git@github.com:CSYE6225-Rugved/tf-aws-infra.git
+    git clone git@github.com:CSYE6225-Rugved/terraform-aws-infra.git
     cd tf-aws-infra
     ```
 2. Initialize Terraform:
